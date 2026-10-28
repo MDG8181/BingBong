@@ -32,9 +32,14 @@ All paths are relative, so the app works from any repo name or sub-path.
 
 ## Updating
 
-- Changes to `index.html` reach phones on the next launch with a connection (the service worker fetches the page network-first).
+- Just push. About a minute later, anyone with the app open sees a **"A new version is available"** banner (between rallies, never mid-point); tapping **Update** loads it. The app spots a new push by the changed ETag GitHub Pages gives `index.html`, checking at launch, whenever it comes back to the front, and every 5 minutes.
+- Changes to `index.html` also reach phones on their next launch with a connection (the service worker fetches the page network-first).
 - If you add, rename or change any **other** file the app caches (icons, fonts, manifest), bump `VERSION` in `sw.js` so installed copies re-download them.
-- If you change `icon-512.png`, regenerate the launch screens in `splash/` (one per iPhone/iPad screen size, listed in `index.html` between the `<!--SPLASH-->` markers).
+- If you change `icon-512.png`, regenerate the launch screens in `splash/` (one per iPhone/iPad screen size, listed in `index.html` between the `<!--SPLASH-->` markers). Each one carries the same gold frame as the app, so launch flows straight into the game.
+
+## Screen fit
+
+On iPhones and iPads the game fills the whole screen inside a thin gold frame whose inner corners follow the screen's own rounded corners (radii per model are in `CORNERS` in `index.html`). The field runs under the status bar and home indicator, and both paddles sit the same distance inside them. Home-screen apps on iOS 26 can report a viewport a home-indicator shorter than the screen ([WebKit bug 292603](https://bugs.webkit.org/show_bug.cgi?id=292603)), so the installed app sizes itself from the real screen size instead.
 
 ## Files
 

@@ -43,7 +43,8 @@
 <!--/SPLASH-->
 <title>Bing Bong</title>
 <style>
-/* Layout: one centered portrait court that JS sizes to fill the screen, overlays on top. Single-theme by design. */
+/* Layout: a full-screen app with a gold frame hugging the screen's rounded corners, the court inside it,
+   overlays on top. JS sizes everything (see layout). Single-theme by design. */
 @font-face { font-family: "Bungee"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/bungee-latin.woff2) format("woff2"); }
 @font-face { font-family: "Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url(fonts/nunito-latin.woff2) format("woff2"); }
 :root {
@@ -56,28 +57,25 @@
   --poop: #7a4a21;
   --display: "Bungee", "Arial Black", Impact, sans-serif;
   --body: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+  --gold: linear-gradient(165deg, #ffe680, #f4d33b 30%, #e2bd1c 75%, #f7dc55);
   color-scheme: light;
 }
-html, body { height: 100%; }
-body {
-  background: var(--ink);
-  color: var(--cream);
-  font-family: var(--body);
-  display: grid; place-items: center;
-  box-sizing: border-box;
-}
-/* framed: a bordered court centered on wide screens (desktop, a tablet on its side) */
+/* the page behind the app is gold too, so any sliver iOS leaves uncovered just reads as frame */
+html, body { height: 100%; background: #f4d33b; }
+body { color: var(--cream); font-family: var(--body); }
+/* the app is pinned to the screen; JS gives it the exact screen size */
+#app { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: var(--gold); }
+/* the court sits inside the gold frame; its corner radius follows the phone's screen corners */
 .court {
-  position: relative;
-  width: 360px; height: 480px; /* JS sets the real size */
-  border: 4px solid var(--cream);
-  border-radius: 6px;
+  position: absolute; left: 0; top: 0;
+  width: 360px; height: 480px; /* JS sets the real size and position */
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 0 0 4px var(--ink), 0 12px 30px rgb(0 0 0 / .5);
+  box-shadow: 0 0 0 2px rgb(31 42 18 / .55); /* a thin dark rim where the gold meets the field */
 }
-body:not(.full) { padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
-/* full: on phones the court is the whole screen and runs under the status bar and home indicator */
-body.full .court { border: 0; border-radius: 0; box-shadow: none; }
+/* framed: on wide screens (desktop, a tablet on its side) a gold-rimmed court sits centered on dark green */
+#app.framed { background: var(--ink); }
+#app.framed .court { box-shadow: 0 0 0 6px #f4d33b, 0 0 0 8px rgb(0 0 0 / .35), 0 14px 40px rgb(0 0 0 / .5); }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #safe { position: fixed; inset: 0; visibility: hidden; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 /* round buttons sitting on the center line: pause on the right, power-up drops (robot battles) on the left */
@@ -209,12 +207,23 @@ button:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
 .install b { color: var(--butter); font-weight: 800; }
 .install svg { width: 15px; height: 15px; vertical-align: -2px; fill: none; stroke: var(--butter); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 #installX { background: none; border: 0; box-shadow: none; color: var(--cream); font-family: var(--body); font-size: 1rem; padding: 2px 10px; opacity: .7; }
+/* "A new version is available" banner, shown between games after a new push goes live */
+.update {
+  position: absolute; left: 50%; transform: translateX(-50%); top: max(12px, calc(env(safe-area-inset-top) + 4px));
+  width: max-content; max-width: calc(100% - 24px); box-sizing: border-box;
+  display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 999px;
+  background: rgb(31 42 18 / .94); box-shadow: 0 4px 14px rgb(0 0 0 / .35); font-size: .8rem; font-weight: 700;
+  animation: drop-in .4s cubic-bezier(.2, 1.4, .4, 1);
+}
+#updateGo { font-size: .7rem; padding: 6px 14px; border-width: 2px; border-radius: 999px; box-shadow: 0 2px 0 var(--ink); }
+@keyframes drop-in { from { transform: translate(-50%, -160%); } }
+@media (prefers-reduced-motion: reduce) { .update { animation: none; } }
 /* phone app: no page scroll, bounce, zoom or text selection */
 [hidden] { display: none !important; }
-html { background: var(--ink); -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; }
 html, body { overscroll-behavior: none; }
 body {
-  margin: 0; font-size: 14px; overflow: hidden; height: 100%; height: 100dvh;
+  margin: 0; font-size: 14px; overflow: hidden;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -226,6 +235,7 @@ canvas { touch-action: none; }
 
 </head>
 <body>
+<div id="app">
 <div class="court">
   <canvas id="c" width="480" height="640" aria-label="Pong court"></canvas>
   <div class="score" aria-live="polite"><b id="lab1">P1</b> <span id="s1">0</span><br><b id="lab2">P2</b> <span id="s2">0</span></div>
@@ -258,6 +268,11 @@ canvas { touch-action: none; }
     <span>Install: tap <b>Share</b> <svg viewBox="0 0 24 24" aria-label="Share icon"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5M8 10H5v11h14V10h-3"/></svg> then <b>Add to Home Screen</b></span>
     <button id="installX" type="button" aria-label="Dismiss install tip">✕</button>
   </div>
+  <div class="update" id="update" role="status" hidden>
+    <span>✨ A new version is available</span>
+    <button id="updateGo" type="button">Update</button>
+  </div>
+</div>
 </div>
 <div id="safe" aria-hidden="true"></div>
 
@@ -652,45 +667,87 @@ let chromeKey = '';
 function syncChrome() {
   const spec = botBattle() && state !== 'ready', canPause = state === 'play' || state === 'countdown';
   const tip = state === 'ready' && canInstall && !tipDismissed && $('picker').hidden;
-  const key = `${spec}${canPause}${tip}`;
+  const upd = updateReady && !['play', 'countdown', 'scored'].includes(state); // never in the middle of a rally
+  const key = `${spec}${canPause}${tip}${upd}`;
   if (key === chromeKey) return;
   chromeKey = key;
   $('dropBtn').hidden = !spec;
   if (!spec) showDrops(false);
   $('pause').hidden = !canPause;
   $('install').hidden = !tip;
+  $('update').hidden = !upd;
 }
 
-// ---------- layout: fill the phone screen edge to edge, keep the canvas sharp ----------
-const court = document.querySelector('.court');
+// ---------- layout: the app fills the screen exactly, framed in gold, with a sharp canvas ----------
+const app = $('app'), court = document.querySelector('.court');
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+// corner radius (in points) of each rounded iPhone/iPad screen, by portrait screen size, so the frame hugs the glass
+const CORNERS = {
+  '375x812': 40, '360x780': 44, '390x844': 47.33, '428x926': 53.33, '393x852': 55, '430x932': 55,
+  '402x874': 62, '420x912': 62, '440x956': 62,
+  '744x1133': 21.5, '820x1180': 18, '834x1194': 18, '834x1210': 18, '1024x1366': 18, '1032x1376': 18,
+};
+function screenSize() {
+  let w = innerWidth, h = innerHeight;
+  // iOS 26 home-screen apps can report a viewport one home-indicator shorter than the screen (WebKit bug 292603),
+  // which leaves a strip at the bottom. When the app owns the whole screen, use the real screen size instead.
+  if (standalone && isIOS) {
+    const s = Math.min(screen.width, screen.height), l = Math.max(screen.width, screen.height);
+    const [sw, sh] = w <= h ? [s, l] : [l, s];
+    if (Math.abs(sw - w) < 2 && sh > h && sh - h < 80) h = sh;
+  }
+  return [w, h];
+}
+function cornerRadius() {
+  if (!standalone) return 14; // in Safari the page doesn't reach the screen's corners
+  const s = Math.min(screen.width, screen.height), l = Math.max(screen.width, screen.height);
+  if (s === 414 && l === 896) return devicePixelRatio >= 3 ? 39 : 41.5; // XS Max / 11 Pro Max vs XR / 11
+  return CORNERS[`${s}x${l}`] ?? (l / s > 1.9 ? Math.round(s * .13) : 0);
+}
 function layout() {
-  const body = document.body, vw = body.clientWidth, vh = body.clientHeight;
+  const [vw, vh] = screenSize();
   if (vw < 60 || vh < 60) return;
-  // upright screens (phones, tablets) get the court edge to edge; wider screens get a framed 3:4 court
+  app.style.width = vw + 'px'; app.style.height = vh + 'px';
+  // upright screens (phones, tablets) get the court edge to edge inside a thin gold frame;
+  // wider screens (desktop, a tablet or phone on its side) get a gold-rimmed 3:4 court in the middle
   const full = vw / vh <= .75;
-  body.classList.toggle('full', full);
-  let aw = vw, ah = vh;
-  if (!full) { const bs = getComputedStyle(body); aw -= parseFloat(bs.paddingLeft) + parseFloat(bs.paddingRight) + 8; ah -= parseFloat(bs.paddingTop) + parseFloat(bs.paddingBottom) + 8; } // 8 = the frame's border
+  app.classList.toggle('framed', !full);
+  const sp = getComputedStyle($('safe')), px = v => parseFloat(v) || 0;
+  const safe = { t: px(sp.paddingTop), r: px(sp.paddingRight), b: px(sp.paddingBottom), l: px(sp.paddingLeft) };
+  let bx, by, bw, bh, radius;
+  if (full) {
+    const frame = Math.round(Math.min(10, Math.max(5, Math.min(vw, vh) * .016)));
+    bx = by = frame; bw = vw - 2 * frame; bh = vh - 2 * frame;
+    radius = Math.max(8, cornerRadius() - frame); // inner curve of the frame runs parallel to the screen's corner
+  } else {
+    const m = 18; // room for the gold rim
+    bx = Math.max(m, safe.l + 8); by = Math.max(m, safe.t + 8);
+    bw = vw - bx - Math.max(m, safe.r + 8); bh = vh - by - Math.max(m, safe.b + 8);
+    radius = 12;
+  }
+  if (bw < 60 || bh < 60) return;
   if (state === 'ready') {
-    // between games the court takes the screen's shape: longer on tall phones, a touch narrower on the very tallest
+    // between games the court takes the frame's shape: longer on tall phones, a touch narrower on the very tallest
     let w = 480, h = 640;
-    if (full) { h = Math.min(900, w * vh / vw); w = Math.max(380, h * vw / vh); }
+    if (full) { h = Math.min(900, w * bh / bw); w = Math.max(380, h * bw / bh); }
     if (w !== W || h !== H) { W = w; H = h; dark.width = Math.ceil(W); dark.height = Math.ceil(H); }
   }
-  const cw = Math.min(aw, ah * W / H), ch = cw * H / W;
-  court.style.width = cw + 'px'; court.style.height = ch + 'px';
+  const cw = Math.min(bw, bh * W / H), ch = cw * H / W, cx = bx + (bw - cw) / 2, cy = by + (bh - ch) / 2;
+  Object.assign(court.style, { left: cx + 'px', top: cy + 'px', width: cw + 'px', height: ch + 'px', borderRadius: radius + 'px' });
   if (state === 'ready') {
     // keep both paddles the same distance in from the status bar / home indicator, so neither player is short-changed
-    const sp = getComputedStyle($('safe')), inset = full ? Math.max(parseFloat(sp.paddingTop) || 0, parseFloat(sp.paddingBottom) || 0) : 0;
+    const inset = full ? Math.max(0, safe.t - cy, safe.b - (vh - cy - ch)) : 0;
     EDGE = inset * W / cw;
     if (p1) { p1.y = topY(); p2.y = bottomY(); }
   }
   // draw at the screen's real resolution (at most 2x, and at most ~3 megapixels, so older devices keep 60fps)
   const s = Math.min(Math.min(2, devicePixelRatio || 1) * cw / W, Math.sqrt(3.2e6 / (W * H)));
-  const bw = Math.round(W * s), bh = Math.round(H * s);
-  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; if (state) render(); }
+  const cvw = Math.round(W * s), cvh = Math.round(H * s);
+  if (cv.width !== cvw || cv.height !== cvh) { cv.width = cvw; cv.height = cvh; if (state) render(); }
 }
-new ResizeObserver(() => layout()).observe(document.body);
+// iOS reports the new size a moment after a rotation, so lay out again shortly after
+for (const t of ['resize', 'orientationchange']) addEventListener(t, () => { layout(); setTimeout(layout, 350); });
 
 addEventListener('keydown', e => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -1607,11 +1664,34 @@ function keepAwake(on) {
 }
 
 // ---------- "Add to Home Screen" tip, only in iPhone/iPad Safari ----------
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const canInstall = isIOS && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches;
+const canInstall = isIOS && !standalone;
 let tipDismissed = false;
 try { tipDismissed = localStorage.getItem('bing-bong-tip') === '1'; } catch {}
 $('installX').addEventListener('click', () => { tipDismissed = true; try { localStorage.setItem('bing-bong-tip', '1'); } catch {} });
+
+// ---------- "A new version is available" ----------
+// Every push to GitHub Pages gives index.html a new ETag. The app remembers the one it was loaded with and
+// compares it with the live one at launch, whenever it comes back to the front, and every few minutes.
+let builtTag = null, updateReady = false;
+const pageURL = new URL('index.html', location.href).href;
+const etag = res => (res?.headers.get('ETag') || res?.headers.get('Last-Modified') || '').replace(/^W\//, '') || null;
+async function checkForUpdate() {
+  if (updateReady || location.protocol !== 'https:' || document.hidden) return; // only on the hosted site
+  try {
+    // the version this page came from is the copy the service worker cached alongside it
+    if (!builtTag) builtTag = etag(await window.caches?.match(pageURL));
+    // ?check tells the service worker (and GitHub's CDN) to ask the server
+    const live = etag(await fetch(`${pageURL}?check=${Date.now()}`, { method: 'HEAD', cache: 'no-store' }));
+    if (!live) return;
+    if (!builtTag) builtTag = live;
+    else if (live !== builtTag) updateReady = true;
+  } catch {}
+}
+$('updateGo').addEventListener('click', () => location.reload());
+checkForUpdate();
+setInterval(checkForUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+addEventListener('online', checkForUpdate);
 
 // stop the page from rubber-banding or pinch-zooming; only the picker screens scroll
 document.addEventListener('touchmove', e => { if (!e.target.closest?.('.picker')) e.preventDefault(); }, { passive: false });

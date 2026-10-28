@@ -1,7 +1,7 @@
 // Bing Bong offline support.
 // The page itself is fetched fresh whenever there is a connection, so a new deploy shows up on the next launch.
 // Bump VERSION when you add, rename or change any of the other FILES, so phones re-download them.
-const VERSION = 'bing-bong-v2';
+const VERSION = 'bing-bong-v3';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
@@ -30,14 +30,18 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  // the page's "is there a new version?" check always goes to the server
+  if (url.searchParams.has('check')) return;
 
   // The page: network first (gives up after 3s on a bad connection), cached copy when offline.
+  // 'no-cache' revalidates with the server instead of trusting the browser's 10-minute HTTP cache,
+  // so tapping "Update" really loads the new version.
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       const cache = await caches.open(VERSION);
       const cached = (await cache.match('./index.html')) || (await cache.match('./'));
-      const net = fetch(req).then(async res => {
-        if (res.type === 'opaqueredirect') return res;
+      const net = fetch(new Request(url.href, { cache: 'no-cache', credentials: 'same-origin' })).then(async res => {
+        if (res.redirected) return Response.redirect(res.url, 302);
         if (!res.ok) return cached || res;
         await cache.put('./index.html', res.clone()).catch(() => {});
         return res;
