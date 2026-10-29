@@ -416,7 +416,11 @@ function goNext() {
 els.go.addEventListener('click', goNext);
 els.quit.addEventListener('click', resetAll);
 $('pause').addEventListener('click', pause);
-const BALLS = [['poop', 'Poop'], ['eagle', 'Bald eagle'], ['pizza', 'Pizza'], ['basketball', 'Basketball'], ['football', 'Football'], ['baseball', 'Baseball'], ['pingpong', 'Ping pong'], ['qbpurple', 'Purple QB'], ['qbburgundy', 'Burgundy QB'], ['eightball', '8 ball']];
+// new balls go at the end: saved settings remember the ball by its position in this list
+const BALLS = [['poop', 'Poop'], ['eagle', 'Bald eagle'], ['pizza', 'Pizza'], ['basketball', 'Basketball'], ['football', 'Football'], ['baseball', 'Baseball'], ['pingpong', 'Ping pong'], ['qbpurple', 'Purple QB'], ['qbburgundy', 'Burgundy QB'], ['eightball', '8 ball'],
+  ['soccer', 'Soccer ball'], ['tennis', 'Tennis ball'], ['volleyball', 'Volleyball'], ['beachball', 'Beach ball'], ['bowling', 'Bowling ball'],
+  ['donut', 'Donut'], ['cookie', 'Cookie'], ['burger', 'Cheeseburger'], ['watermelon', 'Watermelon'], ['egg', 'Fried egg'],
+  ['cool', 'Cool face'], ['eyeball', 'Eyeball'], ['earth', 'Planet Earth'], ['discoball', 'Disco ball'], ['bomb', 'Bomb']];
 const FIELDS = [['classic', 'Classic'], ['usa', 'American flag'], ['italy', 'Italian flag'], ['redblue', 'Red & blue'], ['purplegold', 'Purple & gold'], ['burgundygold', 'Burgundy & gold'], ['baseball', 'Baseball field'], ['football', 'Football field'], ['basketball', 'Basketball court'], ['pool', 'Pool table'], ['pingpong', 'Ping pong table']];
 let ballIdx = 0, fieldIdx = 0;
 const MODES = ['2 players', 'Vs robot', 'Bot vs bot'];
@@ -1362,6 +1366,210 @@ function drawBall(x, y, rot, sc = 1) {
     ctx.fillStyle = '#f2b51c'; ctx.beginPath(); ctx.arc(1, -5, 2.6, 0, 7); ctx.fill();
     ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(1.4, -5, 1.3, 0, 7); ctx.fill();
     ctx.strokeStyle = '#333'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-3, -9.5); ctx.lineTo(5, -7); ctx.stroke();
+  } else if (t === 'soccer') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.fillStyle = '#fbfbf6'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    ctx.fillStyle = ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 1;
+    const pent = (cx, cy, r, a) => { ctx.beginPath(); for (let i = 0; i < 5; i++) ctx.lineTo(cx + Math.cos(a + i * 1.2566) * r, cy + Math.sin(a + i * 1.2566) * r); ctx.fill(); };
+    // a pentagon in the middle, seams out to five more peeking over the edge
+    pent(0, 0, R * .38, -Math.PI / 2);
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * 1.2566;
+      pent(Math.cos(a) * R * 1.05, Math.sin(a) * R * 1.05, R * .38, a + Math.PI);
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * .38, Math.sin(a) * R * .38); ctx.lineTo(Math.cos(a) * R * .7, Math.sin(a) * R * .7); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+  } else if (t === 'tennis') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.fillStyle = '#d6ea3c'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#8a9a1e'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R - .7, 0, 7); ctx.clip();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(-R * 1.15, 0, R * .9, -1, 1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(R * 1.15, 0, R * .9, Math.PI - 1, Math.PI + 1); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-5, -6, 3.5, 2, -.6, 0, 7); ctx.fill();
+  } else if (t === 'volleyball') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.fillStyle = '#fdfdf8'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    // three curved panels swirling out of the middle
+    for (let i = 0; i < 3; i++) {
+      ctx.rotate(Math.PI * 2 / 3);
+      ctx.strokeStyle = i === 1 ? '#f4c21b' : '#2f6fd6'; ctx.lineWidth = R * .4;
+      ctx.beginPath(); ctx.arc(R * .9, R * .6, R * 1.05, Math.PI * .95, Math.PI * 1.55); ctx.stroke();
+      ctx.strokeStyle = '#1f2a3a'; ctx.lineWidth = .9;
+      for (const rr of [.85, 1.25]) { ctx.beginPath(); ctx.arc(R * .9, R * .6, R * rr, Math.PI * .95, Math.PI * 1.55); ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+  } else if (t === 'beachball') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    // stripes fan out from a pole off to one side, so it reads as round
+    const px = R * .3, py = -R * .35, cols = ['#e8402f', '#ffffff', '#2f6fd6', '#ffffff', '#f4c21b', '#ffffff'];
+    cols.forEach((c, i) => {
+      const a0 = i * Math.PI / 3, a1 = a0 + Math.PI / 3;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(px, py);
+      ctx.lineTo(px + Math.cos(a0) * R * 3, py + Math.sin(a0) * R * 3); ctx.lineTo(px + Math.cos(a1) * R * 3, py + Math.sin(a1) * R * 3); ctx.fill();
+    });
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(px, py, R * .2, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.ellipse(-6, -6, 3, 1.6, -.7, 0, 7); ctx.fill();
+  } else if (t === 'bowling') {
+    ctx.rotate(rot ?? ball.spin);
+    const gb = ctx.createRadialGradient(-5, -5, 1, 0, 0, R);
+    gb.addColorStop(0, '#8f7dff'); gb.addColorStop(.55, '#3d2fb5'); gb.addColorStop(1, '#1a1257');
+    ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#110b38'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = '#0b0726';
+    for (const [hx, hy, hr] of [[-3.4, -4.6, 1.9], [3.4, -4.6, 1.9], [0, 2.6, 2.4]]) { ctx.beginPath(); ctx.arc(hx, hy, hr, 0, 7); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.ellipse(-6, -7, 3, 1.5, -.6, 0, 7); ctx.fill();
+  } else if (t === 'donut') {
+    ctx.rotate(rot ?? ball.spin);
+    const hole = R * .32;
+    // the hole is left unpainted, so the field shows through it
+    ctx.fillStyle = '#d99a52'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.moveTo(hole, 0); ctx.arc(0, 0, hole, 0, 7, true); ctx.fill();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#ff7eb6'; ctx.beginPath();
+    for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2, r = R * (.82 + Math.sin(i * 1.7) * .05); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.moveTo(hole + 1.5, 0); ctx.arc(0, 0, hole + 1.5, 0, 7, true); ctx.fill();
+    const sprinkle = ['#ffffff', '#59c8ff', '#ffd23f', '#35e07a', '#b07cff'];
+    for (let i = 0; i < 10; i++) {
+      const a = i * .63 + .3, r = R * (.55 + (i % 3) * .08);
+      ctx.save(); ctx.translate(Math.cos(a) * r, Math.sin(a) * r); ctx.rotate(i * 1.3);
+      ctx.fillStyle = sprinkle[i % 5]; ctx.fillRect(-1.5, -.6, 3, 1.2); ctx.restore();
+    }
+  } else if (t === 'cookie') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.fillStyle = '#d29a52'; ctx.beginPath();
+    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, r = R * (1 - (i * 7 % 5) * .025); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 1.3; ctx.stroke();
+    ctx.fillStyle = '#e2b06a'; ctx.beginPath(); ctx.ellipse(-3, -4, 6, 4, -.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#4a2a14';
+    for (const [cx, cy, cr] of [[-5, -3, 2.2], [4, -6, 1.8], [6, 2, 2.3], [-1, 5, 2], [-7, 4, 1.5], [1, -1, 1.6], [8, -2, 1.2]]) { ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 7); ctx.fill(); }
+  } else if (t === 'burger') {
+    ctx.rotate(rot ?? Math.sin(ball.spin) * 0.25);
+    const bun = '#e8a043';
+    ctx.lineWidth = 1.2; ctx.strokeStyle = '#5a3412';
+    ctx.fillStyle = bun; roundRect(-R + 1, 6, 2 * R - 2, 6, 3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#6b3a1f'; roundRect(-R, 1, 2 * R, 6, 3); ctx.fill(); ctx.stroke();
+    // cheese with a couple of drips, then lettuce
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.moveTo(-R, -.5); ctx.lineTo(R, -.5); ctx.lineTo(R, 1.5); ctx.lineTo(6, 1.5); ctx.lineTo(4, 5); ctx.lineTo(2, 1.5);
+    ctx.lineTo(-5, 1.5); ctx.lineTo(-7, 4.5); ctx.lineTo(-9, 1.5); ctx.lineTo(-R, 1.5); ctx.fill();
+    ctx.fillStyle = '#5cc23a'; ctx.beginPath(); ctx.moveTo(-R - 1, -1);
+    for (let x = -R - 1; x <= R; x += 3) ctx.quadraticCurveTo(x + 1.5, 1.8, x + 3, -1);
+    ctx.lineTo(R + 1, -3); ctx.lineTo(-R - 1, -3); ctx.fill();
+    // top bun with sesame seeds
+    ctx.fillStyle = bun; ctx.beginPath(); ctx.moveTo(-R, -2); ctx.bezierCurveTo(-R, -R - 3, R, -R - 3, R, -2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff4d6';
+    for (const [sx, sy, sa] of [[-6, -7, -.4], [-1, -10, .2], [4, -8, .5], [8, -5, .9], [-9, -4, -.8], [1, -5, -.2]]) { ctx.beginPath(); ctx.ellipse(sx, sy, 1.4, .8, sa, 0, 7); ctx.fill(); }
+  } else if (t === 'watermelon') {
+    ctx.rotate(rot ?? ball.spin);
+    ctx.fillStyle = '#2f8f3a'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c9f0a8'; ctx.beginPath(); ctx.arc(0, 0, R - 2.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff4d5e'; ctx.beginPath(); ctx.arc(0, 0, R - 3.6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1b1b1b';
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + .3, r = i % 2 ? 4.5 : 7.5;
+      ctx.save(); ctx.translate(Math.cos(a) * r, Math.sin(a) * r); ctx.rotate(a);
+      ctx.beginPath(); ctx.ellipse(0, 0, 1.6, .9, 0, 0, 7); ctx.fill(); ctx.restore();
+    }
+    ctx.strokeStyle = '#1d5a25'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+  } else if (t === 'egg') {
+    ctx.rotate(rot ?? ball.spin * .5);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath();
+    for (let i = 0; i <= 36; i++) { const a = i / 36 * Math.PI * 2, r = R * (.9 + Math.sin(i * 1.1) * .07 + Math.sin(i * .37) * .05); ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.fill(); ctx.strokeStyle = '#d8d2c0'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#ffb21e'; ctx.beginPath(); ctx.arc(1.5, 1, R * .42, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e08a00'; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.ellipse(-.5, -1.5, 2, 1.1, -.6, 0, 7); ctx.fill();
+  } else if (t === 'cool') {
+    ctx.rotate(rot ?? Math.sin(ball.spin) * 0.25);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#a8740a'; ctx.lineWidth = 1.4; ctx.stroke();
+    // shades
+    ctx.fillStyle = '#16161c';
+    ctx.fillRect(-R + 2, -5.5, 2 * R - 4, 1.6);
+    roundRect(-10, -5.5, 8.5, 6, 2.5); ctx.fill();
+    roundRect(1.5, -5.5, 8.5, 6, 2.5); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-8, -1.5); ctx.lineTo(-5.5, -4.5); ctx.moveTo(3.5, -1.5); ctx.lineTo(6, -4.5); ctx.stroke();
+    // smirk
+    ctx.strokeStyle = '#3a2a08'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(1, 1.5, 6, .35, Math.PI - .7); ctx.stroke(); ctx.lineCap = 'butt';
+  } else if (t === 'eyeball') {
+    // stays upright and looks where it's flying
+    const moving = rot === undefined && ball, look = moving ? Math.atan2(ball.vy, ball.vx) : Math.PI / 2, off = moving ? 4 : 1.5;
+    ctx.fillStyle = '#fbfaf5'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#b9b2a0'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    ctx.strokeStyle = 'rgba(220,40,50,.55)'; ctx.lineWidth = .8;
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.05 + .4;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R);
+      ctx.quadraticCurveTo(Math.cos(a + .3) * R * .7, Math.sin(a + .3) * R * .7, Math.cos(a - .1) * R * .55, Math.sin(a - .1) * R * .55); ctx.stroke();
+    }
+    ctx.restore();
+    const ix = Math.cos(look) * off, iy = Math.sin(look) * off;
+    ctx.fillStyle = '#3a9be0'; ctx.beginPath(); ctx.arc(ix, iy, 5.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#1d5f99'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(ix, iy, 2.6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ix - 1.8, iy - 1.8, 1.2, 0, 7); ctx.fill();
+  } else if (t === 'earth') {
+    ctx.rotate(-.4); // tilted axis
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    ctx.fillStyle = '#2f7fe0'; ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    // continents and clouds slide across as it spins
+    const turn = (rot ?? ball.spin) * 6, wrap = x => ((x % 42) + 42) % 42 - 21;
+    ctx.fillStyle = '#3fb34f';
+    for (const [bx, by, bw, bh] of [[0, -4, 6, 4.5], [3, 1, 4, 5], [12, 4, 4, 6], [14, -3, 3, 3], [24, -5, 6, 3.5], [27, 0, 3.5, 4], [34, 6, 4, 2.5]]) {
+      ctx.beginPath(); ctx.ellipse(wrap(bx + turn), by, bw, bh, .3, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    for (const [bx, by, bw] of [[6, -8, 5], [19, 7, 6], [31, -2, 4]]) { ctx.beginPath(); ctx.ellipse(wrap(bx + turn * 1.3), by, bw, 1.3, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#f2f8ff'; ctx.beginPath(); ctx.ellipse(0, -R, R * .6, 3, 0, 0, 7); ctx.ellipse(0, R, R * .5, 2.5, 0, 0, 7); ctx.fill();
+    const sh = ctx.createRadialGradient(-5, -5, 2, 0, 0, R * 1.1);
+    sh.addColorStop(0, 'rgba(255,255,255,.25)'); sh.addColorStop(.6, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(0,0,40,.5)');
+    ctx.fillStyle = sh; ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    ctx.restore();
+    ctx.strokeStyle = '#123f80'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+  } else if (t === 'discoball') {
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+    // mirror tiles that twinkle, a few catching coloured light
+    const sz = 3.6, flick = Math.floor(tick / 6);
+    for (let gy = -R; gy < R; gy += sz) for (let gx = -R; gx < R; gx += sz) {
+      const k = Math.round(gx / sz) * 7 + Math.round(gy / sz) * 13 + flick, h = ((k * 37) % 11 + 11) % 11;
+      const v = 140 + h * 10;
+      ctx.fillStyle = h === 10 ? (k & 1 ? '#ff9df0' : '#7df9ff') : `rgb(${v},${v},${v + 14})`;
+      ctx.fillRect(gx + .3, gy + .3, sz - .6, sz - .6);
+    }
+    const sh = ctx.createRadialGradient(-4, -4, 2, 0, 0, R);
+    sh.addColorStop(0, 'rgba(255,255,255,.15)'); sh.addColorStop(1, 'rgba(20,20,40,.6)');
+    ctx.fillStyle = sh; ctx.fillRect(-R, -R, 2 * R, 2 * R);
+    ctx.restore();
+    ctx.strokeStyle = '#3a3a48'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.stroke();
+    const s = 3 + Math.sin(tick * .2) * 1.5;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(-5, -6 - s);
+    ctx.quadraticCurveTo(-5, -6, -5 + s, -6); ctx.quadraticCurveTo(-5, -6, -5, -6 + s); ctx.quadraticCurveTo(-5, -6, -5 - s, -6); ctx.quadraticCurveTo(-5, -6, -5, -6 - s); ctx.fill();
+  } else if (t === 'bomb') {
+    ctx.rotate(rot ?? Math.sin(ball.spin) * 0.25);
+    const gb = ctx.createRadialGradient(-4, -3, 1, 0, 1.5, R);
+    gb.addColorStop(0, '#5a5a66'); gb.addColorStop(1, '#141418');
+    ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(0, 1.5, R - 1.5, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(6.5, -8); ctx.rotate(.7); ctx.fillStyle = '#3a3a44'; ctx.fillRect(-3, -2.5, 6, 4); ctx.restore();
+    ctx.strokeStyle = '#c9a36a'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(8, -10); ctx.quadraticCurveTo(12, -15, 9, -17); ctx.stroke();
+    // a lit fuse that flickers
+    const f = 2.6 + Math.sin(tick * .9) * 1.1;
+    for (const [c, k] of [['#ff6a1a', 1.5], ['#ffd23f', 1]]) {
+      const s = f * k;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(9, -17 - s);
+      ctx.quadraticCurveTo(9, -17, 9 + s, -17); ctx.quadraticCurveTo(9, -17, 9, -17 + s); ctx.quadraticCurveTo(9, -17, 9 - s, -17); ctx.quadraticCurveTo(9, -17, 9, -17 - s); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-5, -3, 3, 1.6, -.6, 0, 7); ctx.fill();
   }
   ctx.restore();
 }
