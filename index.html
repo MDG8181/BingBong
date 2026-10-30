@@ -294,6 +294,7 @@ const $ = id => document.getElementById(id);
 const cv = $('c');
 let ctx = cv.getContext('2d');
 const PW = 90, PH = 14, R = 14, WIN = 5, MAX_SPEED = 15, TURBO_MAX = 20, SPEED = 11;
+const PAD = 16; // gap between each paddle and its end of the court
 // Court size in game units. 480x640 is the classic 3:4; on phones it takes the screen's shape (see layout).
 // EDGE keeps the paddles clear of the status bar and home indicator, which the field runs underneath.
 let W = 480, H = 640, EDGE = 0;
@@ -344,7 +345,7 @@ const EMO = {
 for (const pw of POWERS) pw.emoji = EMO[pw.id];
 
 function mkPaddle(y) { return { x: W / 2 - PW / 2, y, w: PW, big: 0, tiny: 0, frozen: 0, reversed: 0, shield: 0, glow: 0, magnet: 0, boots: 0, drunk: 0, double: false }; }
-const topY = () => EDGE + 26, bottomY = () => H - EDGE - 26 - PH;
+const topY = () => EDGE + PAD, bottomY = () => H - EDGE - PAD - PH;
 function newBall(dir, x = W / 2, y = H / 2, ang = Math.random() * 0.8 - 0.4, sp = 5 * Math.sqrt(H / 640)) { // serve a bit faster on longer courts
   return { x, y, vx: sp * Math.sin(ang) * 1.6, vy: sp * dir, spin: 0, r: R, giant: 0, mini: 0, ghost: 0, curve: 0, seed: Math.random() * 9, owner: dir > 0 ? 0 : 1, trail: [] };
 }
@@ -770,8 +771,10 @@ function layout() {
   const cw = Math.min(bw, bh * W / H), ch = cw * H / W, cx = bx + (bw - cw) / 2, cy = by + (bh - ch) / 2;
   Object.assign(court.style, { left: cx + 'px', top: cy + 'px', width: cw + 'px', height: ch + 'px', borderRadius: typeof radius === 'number' ? radius + 'px' : radius });
   if (state === 'ready') {
-    // keep both paddles the same distance in from the status bar / home indicator, so neither player is short-changed
-    const inset = full ? Math.max(0, safe.t - cy, safe.b - (vh - cy - ch)) : 0;
+    // paddles sit right at the ends of the court. Only a status bar drawn over the field (an install from before the
+    // solid status bar) pushes them in, at both ends so neither player is short-changed. The home indicator is just a
+    // thin line, and players steer from anywhere in their half, so the bottom needs no gap.
+    const inset = full ? Math.max(0, safe.t - cy) : 0;
     EDGE = inset * W / cw;
     if (p1) { p1.y = topY(); p2.y = bottomY(); }
   }
