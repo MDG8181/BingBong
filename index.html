@@ -6,6 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>
+  // mark the installed (home-screen) app before the first paint, for the iOS 26 viewport fix in the CSS
+  if (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
+</script>
 <meta name="apple-mobile-web-app-title" content="Bing Bong">
 <meta name="application-name" content="Bing Bong">
 <meta name="theme-color" content="#1f2a12">
@@ -62,9 +66,15 @@
 }
 /* the page behind the app is gold too, so any sliver iOS leaves uncovered just reads as frame */
 html, body { height: 100%; background: #f4d33b; }
+html { position: relative; }
 body { color: var(--cream); font-family: var(--body); }
-/* the app is pinned to the screen; JS gives it the exact screen size */
-#app { position: fixed; left: 0; top: 0; width: 100%; height: 100%; background: var(--gold); }
+/* iOS 26 home-screen apps get a viewport shorter than the screen by the status bar (WebKit bug 301108), and
+   anything pinned to the screen stops being drawn at that short edge, which left a band at the bottom.
+   A page a little taller than that viewport makes iOS report the full screen again; min() with 100lvh
+   keeps it from ever growing past the screen. */
+html.standalone { min-height: min(100lvh, calc(100% + env(safe-area-inset-top))); }
+/* the app covers the whole page (laid out in the page rather than pinned, so it's drawn all the way down) */
+#app { position: absolute; inset: 0; background: var(--gold); }
 /* the court sits inside the gold frame; its corner radius follows the phone's screen corners */
 .court {
   position: absolute; left: 0; top: 0;
@@ -421,7 +431,11 @@ const BALLS = [['poop', 'Poop'], ['eagle', 'Bald eagle'], ['pizza', 'Pizza'], ['
   ['soccer', 'Soccer ball'], ['tennis', 'Tennis ball'], ['volleyball', 'Volleyball'], ['beachball', 'Beach ball'], ['bowling', 'Bowling ball'],
   ['donut', 'Donut'], ['cookie', 'Cookie'], ['burger', 'Cheeseburger'], ['watermelon', 'Watermelon'], ['egg', 'Fried egg'],
   ['cool', 'Cool face'], ['eyeball', 'Eyeball'], ['earth', 'Planet Earth'], ['discoball', 'Disco ball'], ['bomb', 'Bomb']];
-const FIELDS = [['classic', 'Classic'], ['usa', 'American flag'], ['italy', 'Italian flag'], ['redblue', 'Red & blue'], ['purplegold', 'Purple & gold'], ['burgundygold', 'Burgundy & gold'], ['baseball', 'Baseball field'], ['football', 'Football field'], ['basketball', 'Basketball court'], ['pool', 'Pool table'], ['pingpong', 'Ping pong table']];
+// like BALLS, new fields go at the end; the last fifteen match the last fifteen balls, in the same order
+const FIELDS = [['classic', 'Classic'], ['usa', 'American flag'], ['italy', 'Italian flag'], ['redblue', 'Red & blue'], ['purplegold', 'Purple & gold'], ['burgundygold', 'Burgundy & gold'], ['baseball', 'Baseball field'], ['football', 'Football field'], ['basketball', 'Basketball court'], ['pool', 'Pool table'], ['pingpong', 'Ping pong table'],
+  ['soccer', 'Soccer pitch'], ['tennis', 'Tennis court'], ['volleyball', 'Volleyball court'], ['beach', 'Beach'], ['bowling', 'Bowling lane'],
+  ['sprinkles', 'Sprinkles'], ['bakingsheet', 'Baking sheet'], ['grill', 'Grill'], ['picnic', 'Picnic blanket'], ['fryingpan', 'Frying pan'],
+  ['synthwave', 'Synthwave sunset'], ['eyechart', 'Eye chart'], ['space', 'Outer space'], ['dancefloor', 'Dance floor'], ['hazard', 'Danger zone']];
 let ballIdx = 0, fieldIdx = 0;
 const MODES = ['2 players', 'Vs robot', 'Bot vs bot'];
 // miss: chance the robot misjudges a return, speed: px per frame, delay: frames before it reacts, predict: plans wall bounces
@@ -692,17 +706,6 @@ const CORNERS = {
   '402x874': 62, '420x912': 62, '440x956': 62,
   '744x1133': 21.5, '820x1180': 18, '834x1194': 18, '834x1210': 18, '1024x1366': 18, '1032x1376': 18,
 };
-function screenSize() {
-  let w = innerWidth, h = innerHeight;
-  // iOS 26 home-screen apps can report a viewport one home-indicator shorter than the screen (WebKit bug 292603),
-  // which leaves a strip at the bottom. When the app owns the whole screen, use the real screen size instead.
-  if (standalone && isIOS) {
-    const s = Math.min(screen.width, screen.height), l = Math.max(screen.width, screen.height);
-    const [sw, sh] = w <= h ? [s, l] : [l, s];
-    if (Math.abs(sw - w) < 2 && sh > h && sh - h < 80) h = sh;
-  }
-  return [w, h];
-}
 function cornerRadius() {
   if (!standalone) return 14; // in Safari the page doesn't reach the screen's corners
   const s = Math.min(screen.width, screen.height), l = Math.max(screen.width, screen.height);
@@ -710,9 +713,9 @@ function cornerRadius() {
   return CORNERS[`${s}x${l}`] ?? (l / s > 1.9 ? Math.round(s * .13) : 0);
 }
 function layout() {
-  const [vw, vh] = screenSize();
+  // measure what the page really covers (see the iOS 26 note in the CSS) rather than trusting innerHeight
+  const box = app.getBoundingClientRect(), vw = box.width, vh = box.height;
   if (vw < 60 || vh < 60) return;
-  app.style.width = vw + 'px'; app.style.height = vh + 'px';
   // upright screens (phones, tablets) get the court edge to edge inside a thin gold frame;
   // wider screens (desktop, a tablet or phone on its side) get a gold-rimmed 3:4 court in the middle
   const full = vw / vh <= .75;
@@ -724,6 +727,8 @@ function layout() {
     const frame = Math.round(Math.min(10, Math.max(5, Math.min(vw, vh) * .016)));
     bx = by = frame; bw = vw - 2 * frame; bh = vh - 2 * frame;
     radius = Math.max(8, cornerRadius() - frame); // inner curve of the frame runs parallel to the screen's corner
+    // with an opaque status bar (no top inset) the page starts below it, away from the rounded corners
+    if (standalone && safe.t === 0) radius = `10px 10px ${radius}px ${radius}px`;
   } else {
     const m = 18; // room for the gold rim
     bx = Math.max(m, safe.l + 8); by = Math.max(m, safe.t + 8);
@@ -738,7 +743,7 @@ function layout() {
     if (w !== W || h !== H) { W = w; H = h; dark.width = Math.ceil(W); dark.height = Math.ceil(H); }
   }
   const cw = Math.min(bw, bh * W / H), ch = cw * H / W, cx = bx + (bw - cw) / 2, cy = by + (bh - ch) / 2;
-  Object.assign(court.style, { left: cx + 'px', top: cy + 'px', width: cw + 'px', height: ch + 'px', borderRadius: radius + 'px' });
+  Object.assign(court.style, { left: cx + 'px', top: cy + 'px', width: cw + 'px', height: ch + 'px', borderRadius: typeof radius === 'number' ? radius + 'px' : radius });
   if (state === 'ready') {
     // keep both paddles the same distance in from the status bar / home indicator, so neither player is short-changed
     const inset = full ? Math.max(0, safe.t - cy, safe.b - (vh - cy - ch)) : 0;
@@ -750,8 +755,9 @@ function layout() {
   const cvw = Math.round(W * s), cvh = Math.round(H * s);
   if (cv.width !== cvw || cv.height !== cvh) { cv.width = cvw; cv.height = cvh; if (state) render(); }
 }
-// iOS reports the new size a moment after a rotation, so lay out again shortly after
+// iOS reports the new size a moment after a rotation (and after the viewport fix kicks in), so lay out again then
 for (const t of ['resize', 'orientationchange']) addEventListener(t, () => { layout(); setTimeout(layout, 350); });
+new ResizeObserver(() => layout()).observe(app);
 
 addEventListener('keydown', e => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -1007,6 +1013,21 @@ const FIELD_STYLE = {
   pool:       { own: true, p1: '#f2e6c9', p2: '#f2e6c9', l1: 'rgba(255,255,255,.4)', l2: 'rgba(255,255,255,.4)' },
   pingpong:   { own: true, p1: '#d22d2d', p2: '#d22d2d', l1: 'rgba(255,255,255,.55)', l2: 'rgba(255,255,255,.55)' },
   redblue: { line: '#fffbe6', p1: '#fffbe6', p2: '#fffbe6', l1: 'rgba(255,251,230,.6)', l2: 'rgba(255,251,230,.6)' },
+  soccer:      { own: true, p1: '#e8402f', p2: '#2f6fd6', l1: 'rgba(255,255,255,.7)', l2: 'rgba(255,255,255,.7)' },
+  tennis:      { own: true, p1: '#d6ea3c', p2: '#d6ea3c', l1: 'rgba(255,255,255,.65)', l2: 'rgba(255,255,255,.65)' },
+  volleyball:  { own: true, p1: '#ffd23f', p2: '#ffffff', l1: 'rgba(255,255,255,.7)', l2: 'rgba(255,255,255,.7)' },
+  beach:       { line: 'rgba(160,110,50,.5)', p1: '#ff5c8a', p2: '#2f6fd6', l1: 'rgba(140,95,40,.6)', l2: 'rgba(140,95,40,.6)' },
+  bowling:     { own: true, p1: '#e8402f', p2: '#2f6fd6', l1: 'rgba(90,50,15,.6)', l2: 'rgba(90,50,15,.6)' },
+  sprinkles:   { line: 'rgba(255,255,255,.85)', p1: '#ffffff', p2: '#7a4a21', l1: 'rgba(150,30,90,.55)', l2: 'rgba(150,30,90,.55)' },
+  bakingsheet: { line: 'rgba(122,74,33,.5)', p1: '#7a4a21', p2: '#e8a043', l1: 'rgba(122,74,33,.55)', l2: 'rgba(122,74,33,.55)' },
+  grill:       { line: 'rgba(255,170,60,.7)', p1: '#ffd23f', p2: '#e8402f', l1: 'rgba(255,200,150,.6)', l2: 'rgba(255,200,150,.6)' },
+  picnic:      { line: 'rgba(40,110,50,.8)', p1: '#2f8f3a', p2: '#ff4d5e', l1: 'rgba(120,20,30,.6)', l2: 'rgba(120,20,30,.6)' },
+  fryingpan:   { line: 'rgba(255,255,255,.3)', p1: '#ffb21e', p2: '#ffffff', l1: 'rgba(255,255,255,.45)', l2: 'rgba(255,255,255,.45)' },
+  synthwave:   { own: true, p1: '#59c8ff', p2: '#ff4fd8', l1: 'rgba(255,255,255,.6)', l2: 'rgba(255,255,255,.6)' },
+  eyechart:    { own: true, p1: '#1b1b1b', p2: '#d93a3a', l1: 'rgba(0,0,0,.35)', l2: 'rgba(0,0,0,.35)' },
+  space:       { line: 'rgba(255,255,255,.3)', p1: '#7df9ff', p2: '#ff9df0', l1: 'rgba(255,255,255,.5)', l2: 'rgba(255,255,255,.5)' },
+  dancefloor:  { line: 'rgba(255,255,255,.75)', p1: '#ffffff', p2: '#ffd23f', l1: 'rgba(255,255,255,.8)', l2: 'rgba(255,255,255,.8)' },
+  hazard:      { own: true, p1: '#ff6a1a', p2: '#ffd23f', l1: 'rgba(255,255,255,.6)', l2: 'rgba(255,255,255,.6)' },
 };
 function drawField() {
   const f = FIELDS[fieldIdx][0], st = FIELD_STYLE[f];
@@ -1040,6 +1061,7 @@ function drawField() {
   else if (f === 'basketball') drawBasketballCourt();
   else if (f === 'pool') drawPoolTable();
   else if (f === 'pingpong') drawPingPongTable();
+  else if (FIELD_ART[f]) FIELD_ART[f]();
   else if (f === 'italy') {
     const c = ['#009246', '#f4f5f0', '#ce2b37'];
     for (let i = 0; i < 3; i++) { ctx.fillStyle = c[i]; ctx.fillRect(i * W / 3, 0, W / 3 + 1, H); }
@@ -1219,6 +1241,316 @@ function drawPingPongTable() {
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0, H / 2 - 7, W, 3);
   ctx.fillStyle = '#222'; ctx.fillRect(0, H / 2 - 9, 8, 18); ctx.fillRect(W - 8, H / 2 - 9, 8, 18);
 }
+// a repeatable random sequence, so speckled fields come out the same every time they're drawn
+function seeded(seed) { return () => (seed = seed * 16807 % 2147483647) / 2147483647; }
+// draws a court at both ends: once as is, once turned around for the other player
+function bothEnds(draw) {
+  for (const end of [0, 1]) {
+    ctx.save(); if (end) { ctx.translate(W, H); ctx.rotate(Math.PI); }
+    draw(end); ctx.restore();
+  }
+}
+function drawSoccerPitch() {
+  const n = 12, sh = H / n, m = 12;
+  for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? '#3c9a3e' : '#47a948'; ctx.fillRect(0, i * sh, W, sh + 1); }
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 3;
+  ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+  ctx.beginPath(); ctx.moveTo(m, H / 2); ctx.lineTo(W - m, H / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 60, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 4, 0, 7); ctx.fill();
+  bothEnds(() => {
+    const bw = W * .64, bh = H * .16, gw = W * .3, gh = H * .06, spot = m + bh * .7, d = W * .14;
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(W * .4, 0, W * .2, m); // goal net
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeRect((W - bw) / 2, m, bw, bh);
+    ctx.strokeRect((W - gw) / 2, m, gw, gh);
+    ctx.beginPath(); ctx.arc(W / 2, spot, 3, 0, 7); ctx.fill();
+    const a = Math.asin(Math.min(1, bh * .3 / d)); // the "D": the part of the spot's circle outside the box
+    ctx.beginPath(); ctx.arc(W / 2, spot, d, a, Math.PI - a); ctx.stroke();
+    ctx.beginPath(); ctx.arc(m, m, 12, 0, Math.PI / 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W - m, m, 12, Math.PI / 2, Math.PI); ctx.stroke();
+  });
+}
+function drawTennisCourt() {
+  ctx.fillStyle = '#3f8f5c'; ctx.fillRect(0, 0, W, H);
+  const mx = W * .09, my = H * .05, cw = W - 2 * mx, ch = H - 2 * my, sx = mx + cw * .125, sv = ch * .27;
+  ctx.fillStyle = '#2f6db5'; ctx.fillRect(mx, my, cw, ch);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+  ctx.strokeRect(mx, my, cw, ch);
+  ctx.beginPath();
+  ctx.moveTo(sx, my); ctx.lineTo(sx, my + ch); ctx.moveTo(W - sx, my); ctx.lineTo(W - sx, my + ch); // singles sidelines
+  ctx.moveTo(sx, H / 2 - sv); ctx.lineTo(W - sx, H / 2 - sv); ctx.moveTo(sx, H / 2 + sv); ctx.lineTo(W - sx, H / 2 + sv); // service lines
+  ctx.moveTo(W / 2, H / 2 - sv); ctx.lineTo(W / 2, H / 2 + sv);
+  ctx.moveTo(W / 2, my); ctx.lineTo(W / 2, my + 10); ctx.moveTo(W / 2, my + ch); ctx.lineTo(W / 2, my + ch - 10);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(20,20,24,.5)'; ctx.fillRect(mx - 10, H / 2 - 4, cw + 20, 8);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(mx - 10, H / 2 - 5, cw + 20, 2.5);
+  ctx.fillStyle = '#222'; ctx.fillRect(mx - 15, H / 2 - 6, 6, 12); ctx.fillRect(W - mx + 9, H / 2 - 6, 6, 12);
+}
+function drawVolleyballCourt() {
+  ctx.fillStyle = '#2f6fd6'; ctx.fillRect(0, 0, W, H);
+  const mx = W * .08, my = H * .05, atk = (H - 2 * my) / 6;
+  ctx.fillStyle = '#f08a2e'; ctx.fillRect(mx, my, W - 2 * mx, H - 2 * my);
+  ctx.fillStyle = 'rgba(0,0,0,.05)'; for (let x = mx; x < W - mx; x += 20) ctx.fillRect(x, my, 1, H - 2 * my);
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.strokeRect(mx, my, W - 2 * mx, H - 2 * my);
+  ctx.beginPath(); ctx.moveTo(mx, H / 2 - atk); ctx.lineTo(W - mx, H / 2 - atk); ctx.moveTo(mx, H / 2 + atk); ctx.lineTo(W - mx, H / 2 + atk); ctx.stroke();
+  // net, with red-and-white antennas at the sidelines
+  ctx.fillStyle = 'rgba(20,20,24,.45)'; ctx.fillRect(0, H / 2 - 5, W, 10);
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x < W; x += 6) { ctx.moveTo(x, H / 2 - 5); ctx.lineTo(x, H / 2 + 5); }
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, H / 2 - 6, W, 2.5);
+  for (const x of [mx, W - mx]) {
+    ctx.fillStyle = '#e8402f'; ctx.fillRect(x - 2, H / 2 - 16, 4, 32);
+    ctx.fillStyle = '#ffffff'; for (const y of [-16, -8, 0, 8]) ctx.fillRect(x - 2, H / 2 + y, 4, 4);
+  }
+}
+function drawBeach() {
+  const r = seeded(11);
+  ctx.fillStyle = '#f5dfa6'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < W * H / 260; i++) { ctx.fillStyle = r() < .6 ? 'rgba(170,125,60,.22)' : 'rgba(255,255,255,.55)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
+  // the sea laps along both sides
+  bothEnds(() => {
+    const edge = y => 34 + Math.sin(y * .045) * 9 + Math.sin(y * .11) * 3;
+    ctx.fillStyle = '#e6cd8c'; ctx.beginPath(); ctx.moveTo(0, 0); for (let y = 0; y <= H + 8; y += 8) ctx.lineTo(edge(y) + 12, y); ctx.lineTo(0, H); ctx.fill();
+    const sea = ctx.createLinearGradient(0, 0, 50, 0); sea.addColorStop(0, '#1b8fb8'); sea.addColorStop(1, '#46c6dd');
+    ctx.fillStyle = sea; ctx.beginPath(); ctx.moveTo(0, 0); for (let y = 0; y <= H + 8; y += 8) ctx.lineTo(edge(y), y); ctx.lineTo(0, H); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); for (let y = 0; y <= H + 8; y += 8) ctx.lineTo(edge(y), y); ctx.stroke();
+  });
+  // a striped towel, an umbrella seen from above, starfish
+  ctx.save(); ctx.translate(W * .3, H * .25); ctx.rotate(-.25);
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#ff5c8a'; ctx.fillRect(-36 + i * 12, -22, 12, 44); }
+  ctx.restore();
+  ctx.save(); ctx.translate(W * .72, H * .74);
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#2f6fd6'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 38, i * Math.PI / 4, (i + 1) * Math.PI / 4); ctx.fill(); }
+  ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#ff8a5c'; star(W * .74, H * .2, 11); star(W * .28, H * .8, 9);
+}
+function drawBowlingLane() {
+  const gw = W * .09, lw = W - 2 * gw, bw = lw / 20;
+  for (const x of [0, W - gw]) {
+    const g = ctx.createLinearGradient(x, 0, x + gw, 0); g.addColorStop(0, '#45454f'); g.addColorStop(.5, '#1c1c22'); g.addColorStop(1, '#45454f');
+    ctx.fillStyle = g; ctx.fillRect(x, 0, gw, H);
+  }
+  for (let i = 0; i < 20; i++) { ctx.fillStyle = i % 2 ? '#e6bb80' : '#dcae70'; ctx.fillRect(gw + i * bw, 0, bw + .5, H); }
+  ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(gw + lw * .1, 0, lw * .25, H);
+  ctx.fillStyle = '#7a1f1f'; ctx.fillRect(gw, H / 2 - 2, lw, 4); // foul line where the two lanes meet
+  bothEnds(() => {
+    // ten pins at the far end, head pin nearest the middle
+    for (let row = 0; row < 4; row++) for (let k = 0; k <= row; k++) {
+      const x = W / 2 + (k - row / 2) * 22, y = H * .05 + (3 - row) * 17 + 10;
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.arc(x + 1.5, y + 2, 7, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.stroke();
+    }
+    // aiming arrows in a V, and approach dots
+    ctx.fillStyle = '#5a3216';
+    for (let k = 0; k < 7; k++) {
+      const x = gw + lw * (k + 1) / 8, y = H * .3 - (3 - Math.abs(k - 3)) * 12;
+      ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + 4.5, y + 6); ctx.lineTo(x - 4.5, y + 6); ctx.fill();
+    }
+    for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(gw + lw * (k + 1) / 6, H * .4, 2.5, 0, 7); ctx.fill(); }
+  });
+}
+function drawSprinkles() {
+  const r = seeded(5), cols = ['#ffffff', '#59c8ff', '#ffd23f', '#35e07a', '#b07cff', '#ff5c5c'];
+  ctx.fillStyle = '#ff9ec8'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.ellipse(r() * W, r() * H, 70 + r() * 60, 18 + r() * 14, r() * 3, 0, 7); ctx.fill(); }
+  for (let i = 0; i < W * H / 650; i++) {
+    ctx.save(); ctx.translate(r() * W, r() * H); ctx.rotate(r() * Math.PI);
+    ctx.fillStyle = cols[i % cols.length]; roundRect(-5, -1.6, 10, 3.2, 1.6); ctx.fill(); ctx.restore();
+  }
+}
+function drawBakingSheet() {
+  const r = seeded(9);
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#d4d8de'); g.addColorStop(.5, '#eef0f3'); g.addColorStop(1, '#bfc5cc');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(90,96,104,.5)'; ctx.lineWidth = 3; ctx.strokeRect(9, 9, W - 18, H - 18);
+  ctx.fillStyle = '#f1e2c2'; ctx.fillRect(22, 22, W - 44, H - 44); // parchment
+  ctx.strokeStyle = 'rgba(160,120,70,.12)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 46; x < W - 22; x += 24) { ctx.moveTo(x, 22); ctx.lineTo(x, H - 22); }
+  for (let y = 46; y < H - 22; y += 24) { ctx.moveTo(22, y); ctx.lineTo(W - 22, y); }
+  ctx.stroke();
+  // rings where the last batch of cookies baked, and crumbs
+  for (let i = 0; i < 8; i++) {
+    const x = 50 + r() * (W - 100), y = 50 + r() * (H - 100), rr = 22 + r() * 10;
+    ctx.fillStyle = 'rgba(200,150,70,.16)'; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(170,110,40,.22)'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  for (let i = 0; i < W * H / 1500; i++) { ctx.fillStyle = r() < .3 ? '#4a2a14' : '#c98a45'; ctx.fillRect(30 + r() * (W - 60), 30 + r() * (H - 60), 2 + r() * 3, 2 + r() * 2); }
+}
+function drawGrill() {
+  const r = seeded(3);
+  ctx.fillStyle = '#16100e'; ctx.fillRect(0, 0, W, H);
+  // glowing coals under the grate
+  for (let i = 0; i < W * H / 2500; i++) {
+    const x = r() * W, y = r() * H, rr = 10 + r() * 22, g = ctx.createRadialGradient(x, y, 1, x, y, rr);
+    g.addColorStop(0, r() < .5 ? 'rgba(255,140,40,.55)' : 'rgba(255,70,30,.5)'); g.addColorStop(1, 'rgba(255,60,20,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+  }
+  for (let x = 14; x < W; x += 28) {
+    const g = ctx.createLinearGradient(x, 0, x + 9, 0); g.addColorStop(0, '#3a3634'); g.addColorStop(.5, '#9a948f'); g.addColorStop(1, '#3a3634');
+    ctx.fillStyle = g; ctx.fillRect(x, 0, 9, H);
+  }
+}
+function drawPicnic() {
+  ctx.fillStyle = '#fff7ef'; ctx.fillRect(0, 0, W, H);
+  // gingham: see-through red stripes both ways, darker where they cross; lined up with the middle
+  const s = 36;
+  ctx.fillStyle = 'rgba(214,40,52,.42)';
+  for (let x = (W / 2) % (2 * s) - 2 * s; x < W; x += 2 * s) ctx.fillRect(x, 0, s, H);
+  for (let y = (H / 2) % (2 * s) - 2 * s; y < H; y += 2 * s) ctx.fillRect(0, y, W, s);
+  ctx.strokeStyle = 'rgba(214,40,52,.6)'; ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.strokeRect(8, 8, W - 16, H - 16); ctx.setLineDash([]);
+  // two lines of ants marching across
+  ctx.fillStyle = '#1b1b1b';
+  for (const [x0, y0, dx, dy] of [[W * .62, H * .08, 9, 13], [W * .1, H * .9, 14, -6]]) {
+    for (let k = 0; k < 7; k++) {
+      const x = x0 + k * dx + Math.sin(k) * 4, y = y0 + k * dy, a = Math.atan2(dy, dx);
+      for (let b = 0; b < 3; b++) { ctx.beginPath(); ctx.arc(x + Math.cos(a) * b * 3, y + Math.sin(a) * b * 3, b === 1 ? 1.3 : 1.7, 0, 7); ctx.fill(); }
+    }
+  }
+}
+function drawFryingPan() {
+  const g = ctx.createRadialGradient(W * .42, H * .4, 10, W / 2, H / 2, Math.hypot(W, H) * .55);
+  g.addColorStop(0, '#4b4b54'); g.addColorStop(.55, '#2b2b31'); g.addColorStop(1, '#141417');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 2;
+  for (let rr = 20; rr < Math.hypot(W, H) / 2; rr += 12) { ctx.beginPath(); ctx.arc(W / 2, H / 2, rr, 0, 7); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 8; ctx.strokeRect(4, 4, W - 8, H - 8);
+  // the shine of a nonstick pan
+  const shine = ctx.createRadialGradient(W * .3, H * .22, 4, W * .3, H * .22, W * .45);
+  shine.addColorStop(0, 'rgba(255,255,255,.22)'); shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save(); ctx.translate(W * .3, H * .22); ctx.scale(1.6, .7); ctx.translate(-W * .3, -H * .22);
+  ctx.fillStyle = shine; ctx.fillRect(0, 0, W, H); ctx.restore();
+  // melted butter and sizzle bubbles
+  ctx.fillStyle = 'rgba(255,220,120,.1)'; ctx.beginPath(); ctx.ellipse(W * .62, H * .64, 95, 60, .4, 0, 7); ctx.fill();
+  const r = seeded(21);
+  for (let i = 0; i < 45; i++) {
+    const x = r() * W, y = r() * H, rr = 1.5 + r() * 4;
+    ctx.strokeStyle = 'rgba(255,230,150,.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.stroke();
+  }
+}
+function drawSynthwave() {
+  const hz = H / 2, r = seeded(13);
+  const sky = ctx.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, '#140a3a'); sky.addColorStop(.55, '#6b1d79'); sky.addColorStop(1, '#ff6a3d');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz);
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 60; i++) { ctx.globalAlpha = .3 + r() * .7; ctx.fillRect(r() * W, r() * hz * .55, 1.6, 1.6); }
+  ctx.globalAlpha = 1;
+  // a striped sun sitting on the horizon (the gaps are painted with the sky again)
+  const sr = W * .3;
+  ctx.save(); ctx.beginPath(); ctx.arc(W / 2, hz, sr, Math.PI, 0); ctx.clip();
+  const sun = ctx.createLinearGradient(0, hz - sr, 0, hz); sun.addColorStop(0, '#ffe066'); sun.addColorStop(1, '#ff4fa3');
+  ctx.fillStyle = sun; ctx.fillRect(W / 2 - sr, hz - sr, sr * 2, sr);
+  ctx.fillStyle = sky;
+  for (let k = 0; k < 6; k++) ctx.fillRect(W / 2 - sr, hz - 6 - k * sr / 7, sr * 2, 1.5 + (6 - k) * 1.1);
+  ctx.restore();
+  // neon grid floor running off toward the horizon
+  ctx.fillStyle = '#12052b'; ctx.fillRect(0, hz, W, H - hz);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, hz, W, H - hz); ctx.clip();
+  ctx.strokeStyle = '#ff4fd8'; ctx.lineWidth = 2; ctx.shadowColor = '#ff4fd8'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  for (let i = 1; i <= 12; i++) { const y = hz + (H - hz) * (i / 12) ** 2; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  for (let k = -10; k <= 10; k++) { ctx.moveTo(W / 2 + k * 14, hz); ctx.lineTo(W / 2 + k * W * .35, H); }
+  ctx.stroke(); ctx.restore();
+  ctx.fillStyle = '#ff9df0'; ctx.fillRect(0, hz - 1, W, 2);
+}
+function drawEyeChart() {
+  ctx.fillStyle = '#f8f6ef'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#d6d0bf'; ctx.lineWidth = 8; ctx.strokeRect(4, 4, W - 8, H - 8);
+  const rows = ['E', 'F P', 'T O Z', 'L P E D', 'P E C F D', 'E D F C Z P', 'F E L O P Z D'], acuity = [200, 100, 70, 50, 40, 30, 20];
+  // each player reads their own chart from their end
+  bothEnds(() => {
+    let y = 26;
+    rows.forEach((row, i) => {
+      const fs = Math.round(Math.min(H * .1, 70) * (1 - i * .13));
+      y += fs + 6;
+      if (y > H / 2 - 74) return;
+      ctx.textAlign = 'center'; ctx.font = `bold ${fs}px "Arial Black", Arial, sans-serif`; ctx.fillStyle = '#16161a'; ctx.fillText(row, W / 2, y);
+      ctx.textAlign = 'right'; ctx.font = '9px Arial, sans-serif'; ctx.fillStyle = '#9a9488'; ctx.fillText(`20/${acuity[i]}`, W - 14, y);
+    });
+    ctx.fillStyle = '#d93a3a'; ctx.fillRect(W * .16, H / 2 - 62, W * .32, 12);
+    ctx.fillStyle = '#2f9e52'; ctx.fillRect(W * .52, H / 2 - 62, W * .32, 12);
+  });
+  ctx.fillStyle = '#d93a3a'; ctx.fillRect(0, H / 2 - 1.5, W, 3);
+}
+function drawSpace() {
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#060619'); g.addColorStop(.5, '#140b35'); g.addColorStop(1, '#060619');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const [x, y, rr, c] of [[W * .25, H * .3, 160, 'rgba(160,60,255,.22)'], [W * .8, H * .7, 180, 'rgba(40,200,220,.18)'], [W * .6, H * .12, 110, 'rgba(255,80,160,.14)']]) {
+    const n = ctx.createRadialGradient(x, y, 0, x, y, rr); n.addColorStop(0, c); n.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = n; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+  }
+  const r = seeded(17);
+  for (let i = 0; i < W * H / 900; i++) {
+    ctx.globalAlpha = .3 + r() * .7; ctx.fillStyle = r() < .15 ? '#ffe9a8' : '#ffffff';
+    const s = r() < .08 ? 2.4 : 1.3; ctx.fillRect(r() * W, r() * H, s, s);
+  }
+  ctx.globalAlpha = 1;
+  // a moon, and a ringed planet
+  const mx = W * .2, my = H * .17;
+  ctx.fillStyle = '#cfcfdc'; ctx.beginPath(); ctx.arc(mx, my, 26, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(120,120,140,.45)';
+  for (const [cx, cy, cr] of [[-8, -6, 6], [7, 4, 8], [-4, 12, 4], [10, -12, 3]]) { ctx.beginPath(); ctx.arc(mx + cx, my + cy, cr, 0, 7); ctx.fill(); }
+  const px = W * .8, py = H * .84;
+  ctx.strokeStyle = 'rgba(255,220,170,.8)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(px, py, 48, 12, -.35, Math.PI, 0); ctx.stroke(); // back of the ring
+  const pg = ctx.createRadialGradient(px - 8, py - 8, 2, px, py, 26); pg.addColorStop(0, '#ffc38a'); pg.addColorStop(1, '#c25a2a');
+  ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(px, py, 26, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px, py, 48, 12, -.35, 0, Math.PI); ctx.stroke(); // front of the ring
+}
+function drawDanceFloor() {
+  ctx.fillStyle = '#0d0d12'; ctx.fillRect(0, 0, W, H);
+  const cols = ['#ff4fa3', '#59c8ff', '#ffd23f', '#35e07a', '#b07cff', '#ff6a1a'], n = 6, s = W / n;
+  // light-up tiles, lined up with the middle; a few are switched off
+  for (let y = H / 2 - Math.ceil(H / 2 / s) * s, row = 0; y < H; y += s, row++) for (let c = 0; c < n; c++) {
+    const x = c * s, lit = (row * 7 + c * 5) % 4 !== 0, col = cols[(row * 2 + c * 3) % 6];
+    const g = ctx.createRadialGradient(x + s / 2, y + s / 2, 2, x + s / 2, y + s / 2, s * .75);
+    if (lit) { g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(.35, col); g.addColorStop(1, col + '88'); }
+    else { g.addColorStop(0, '#2a2a35'); g.addColorStop(1, '#17171e'); }
+    ctx.fillStyle = g; ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
+  }
+}
+function drawHazardZone() {
+  const r = seeded(29);
+  ctx.fillStyle = '#5d6266'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < W * H / 120; i++) { ctx.fillStyle = r() < .5 ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.08)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
+  // concrete slab joints and cracks
+  ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.beginPath();
+  for (const y of [H / 4, H * .75]) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+  ctx.strokeStyle = 'rgba(20,20,20,.5)'; ctx.lineWidth = 1.5;
+  for (const [x, y] of [[W * .25, H * .2], [W * .7, H * .62], [W * .35, H * .82]]) {
+    let cx = x, cy = y; ctx.beginPath(); ctx.moveTo(cx, cy);
+    for (let k = 0; k < 6; k++) { cx += (r() - .3) * 22; cy += (r() - .5) * 22; ctx.lineTo(cx, cy); }
+    ctx.stroke();
+  }
+  // hazard stripes at both ends and across the middle
+  const band = (y, h) => {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y, W, h); ctx.clip();
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(0, y, W, h); ctx.fillStyle = '#1b1b1b';
+    for (let x = -h; x < W + h; x += 32) { ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x + 16, y + h); ctx.lineTo(x + 16 + h, y); ctx.lineTo(x + h, y); ctx.fill(); }
+    ctx.restore();
+  };
+  band(0, 20); band(H - 20, 20); band(H / 2 - 6, 12);
+  // a warning sign in each half, facing its player
+  bothEnds(() => {
+    ctx.save(); ctx.translate(W / 2, H * .27);
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#1b1b1b'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(24, 18); ctx.lineTo(-24, 18); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1b1b1b'; ctx.font = 'bold 24px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', 0, 6);
+    ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'miter';
+    ctx.restore();
+  });
+}
+const FIELD_ART = {
+  soccer: drawSoccerPitch, tennis: drawTennisCourt, volleyball: drawVolleyballCourt, beach: drawBeach, bowling: drawBowlingLane,
+  sprinkles: drawSprinkles, bakingsheet: drawBakingSheet, grill: drawGrill, picnic: drawPicnic, fryingpan: drawFryingPan,
+  synthwave: drawSynthwave, eyechart: drawEyeChart, space: drawSpace, dancefloor: drawDanceFloor, hazard: drawHazardZone,
+};
 function star(cx, cy, r) {
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {

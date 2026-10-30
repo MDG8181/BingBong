@@ -39,7 +39,7 @@ All paths are relative, so the app works from any repo name or sub-path.
 
 ## Screen fit
 
-On iPhones and iPads the game fills the whole screen inside a thin gold frame whose inner corners follow the screen's own rounded corners (radii per model are in `CORNERS` in `index.html`). The field runs under the status bar and home indicator, and both paddles sit the same distance inside them. Home-screen apps on iOS 26 can report a viewport a home-indicator shorter than the screen ([WebKit bug 292603](https://bugs.webkit.org/show_bug.cgi?id=292603)), so the installed app sizes itself from the real screen size instead.
+On iPhones and iPads the game fills the whole screen inside a thin gold frame whose inner corners follow the screen's own rounded corners (radii per model are in `CORNERS` in `index.html`). The field runs under the status bar and home indicator, and both paddles sit the same distance inside them. Home-screen apps on iOS 26 get a viewport shorter than the screen by the status bar ([WebKit bug 301108](https://bugs.webkit.org/show_bug.cgi?id=301108)), and anything pinned to the screen stops being drawn at that short edge. The installed app makes the page a little taller than that viewport (`html.standalone` in the CSS), which makes iOS report the full screen again, and lays the game out in the page instead of pinning it.
 
 ## Files
 
