@@ -1,7 +1,7 @@
 // Bing Bong offline support.
 // The page itself is fetched fresh whenever there is a connection, so a new deploy shows up on the next launch.
 // Bump VERSION when you add, rename or change any of the other FILES, so phones re-download them.
-const VERSION = 'bing-bong-v3';
+const VERSION = 'bing-bong-v4';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
@@ -47,6 +47,8 @@ self.addEventListener('fetch', e => {
         return res;
       });
       if (!cached) return net;
+      // the "Update" button (?update) waits for the new version however slow the connection is
+      if (url.searchParams.has('update')) return net.catch(() => cached);
       e.waitUntil(net.catch(() => {}));
       return Promise.race([net.catch(() => cached), new Promise(r => setTimeout(r, 3000, cached))]);
     })());

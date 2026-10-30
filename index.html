@@ -2239,28 +2239,35 @@ try { tipDismissed = localStorage.getItem('bing-bong-tip') === '1'; } catch {}
 $('installX').addEventListener('click', () => { tipDismissed = true; try { localStorage.setItem('bing-bong-tip', '1'); } catch {} });
 
 // ---------- "A new version is available" ----------
-// Every push to GitHub Pages gives index.html a new ETag. The app remembers the one it was loaded with and
-// compares it with the live one at launch, whenever it comes back to the front, and every few minutes.
-let builtTag = null, updateReady = false;
+// Every push to GitHub Pages gives index.html a new Last-Modified time and ETag. The app compares the live ones with
+// the copy it is running: at launch, whenever it comes back to the front (a few times over, because iOS often drops
+// the first request after waking an app), and every minute while it's open.
+let updateReady = false, builtTag;
 const pageURL = new URL('index.html', location.href).href;
-const etag = res => (res?.headers.get('ETag') || res?.headers.get('Last-Modified') || '').replace(/^W\//, '') || null;
+// when the running copy was published: the browser keeps the Last-Modified of the page it actually loaded, even when
+// the service worker had to fall back to its saved copy on a slow connection
+const builtTime = Date.parse(document.lastModified);
+const etag = res => (res?.headers.get('ETag') || '').replace(/^W\//, '') || null;
 async function checkForUpdate() {
   if (updateReady || location.protocol !== 'https:' || document.hidden) return; // only on the hosted site
   try {
-    // the version this page came from is the copy the service worker cached alongside it
-    if (!builtTag) builtTag = etag(await window.caches?.match(pageURL));
-    // ?check tells the service worker (and GitHub's CDN) to ask the server
-    const live = etag(await fetch(`${pageURL}?check=${Date.now()}`, { method: 'HEAD', cache: 'no-store' }));
-    if (!live) return;
-    if (!builtTag) builtTag = live;
-    else if (live !== builtTag) updateReady = true;
+    // the copy the service worker saved alongside this page is this version or a newer one
+    if (builtTag === undefined) builtTag = etag(await window.caches?.match(pageURL));
+    // ?check tells the service worker to ask the server
+    const res = await fetch(`${pageURL}?check=${Date.now()}`, { method: 'HEAD', cache: 'no-store' });
+    if (!res.ok) return;
+    const live = etag(res);
+    if (Date.parse(res.headers.get('Last-Modified')) > builtTime + 1000 || (builtTag && live && live !== builtTag)) updateReady = true;
   } catch {}
 }
-$('updateGo').addEventListener('click', () => location.reload());
-checkForUpdate();
-setInterval(checkForUpdate, 5 * 60 * 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
-addEventListener('online', checkForUpdate);
+// "Update" reloads with ?update, which tells the service worker to wait for the network however slow it is
+$('updateGo').addEventListener('click', () => location.replace(`${location.pathname}?update=${Date.now()}`));
+if (location.search.includes('update=')) history.replaceState(null, '', location.pathname);
+const recheck = () => { if (document.hidden) return; checkForUpdate(); setTimeout(checkForUpdate, 2500); setTimeout(checkForUpdate, 8000); };
+recheck();
+setInterval(checkForUpdate, 60 * 1000);
+document.addEventListener('visibilitychange', recheck);
+for (const t of ['online', 'focus', 'pageshow']) addEventListener(t, recheck);
 
 // stop the page from rubber-banding or pinch-zooming; only the picker screens scroll
 document.addEventListener('touchmove', e => { if (!e.target.closest?.('.picker')) e.preventDefault(); }, { passive: false });
