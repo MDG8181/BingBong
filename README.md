@@ -41,6 +41,8 @@ All paths are relative, so the app works from any repo name or sub-path.
 
 On iPhones and iPads the game fills the whole screen inside a thin gold frame whose inner corners follow the screen's own rounded corners (radii per model are in `CORNERS` in `index.html`). The field runs under the status bar and home indicator, and both paddles sit the same distance inside them. Home-screen apps on iOS 26 get a viewport shorter than the screen by the status bar ([WebKit bug 301108](https://bugs.webkit.org/show_bug.cgi?id=301108)), and anything pinned to the screen stops being drawn at that short edge. The installed app makes the page a little taller than that viewport (`html.standalone` in the CSS), which makes iOS report the full screen again, and lays the game out in the page instead of pinning it.
 
+The app leaves out `apple-mobile-web-app-status-bar-style`: Apple deprecated `black-translucent`, and since iOS 26.1 it puts a dark gradient over the top of home-screen apps ([WebKit bug 317153](https://bugs.webkit.org/show_bug.cgi?id=317153)). iOS then draws a solid status bar above the app in the `theme-color`, which the game keeps matched to the top of the court (`syncStatusBar` in `index.html`), so the field runs straight up into it. iOS reads the status bar setting when the app is added to the Home Screen, so an older install needs removing and adding again to pick it up.
+
 ## Files
 
 | File | What it is |

@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- No apple-mobile-web-app-status-bar-style: Apple deprecated black-translucent, and since iOS 26.1 it puts a dark
+     gradient over the top of the app. Without it iOS draws a solid status bar in the theme-color, which the game keeps
+     matched to the top of the court (see syncStatusBar). iOS reads this at install time, so it needs a reinstall. -->
 <script>
   // mark the installed (home-screen) app before the first paint, for the iOS 26 viewport fix in the CSS
   if (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
 </script>
 <meta name="apple-mobile-web-app-title" content="Bing Bong">
 <meta name="application-name" content="Bing Bong">
-<meta name="theme-color" content="#1f2a12">
+<meta name="theme-color" content="#3f8938">
 <meta name="format-detection" content="telephone=no">
 <meta name="description" content="Chaotic top-and-bottom Pong with 22 power-ups, robots and a poop for a ball.">
 <link rel="manifest" href="manifest.webmanifest">
@@ -696,6 +698,26 @@ function syncChrome() {
   $('update').hidden = !upd;
 }
 
+// The installed app gets a solid status bar that iOS paints in the theme-color. Keep that matched to whatever shows at
+// the top of the court, the field's top edge dimmed by any screen over it, so the bar looks like part of the field.
+const themeMeta = document.querySelector('meta[name="theme-color"]');
+let barKey = '', fieldTop = null, fieldTopKey = '';
+function syncStatusBar() {
+  if (fieldTopKey !== fieldKey && fieldCache.width) {
+    fieldTopKey = fieldKey;
+    fieldTop = fieldCache.getContext('2d').getImageData(fieldCache.width >> 2, 1, 1, 1).data;
+  }
+  if (!fieldTop) return;
+  const dim = !$('picker').hidden ? .9 : !els.overlay.hidden ? (state === 'ready' ? .25 : .78) : state === 'countdown' ? .35 : 0;
+  const key = fieldTopKey + dim;
+  if (key === barKey) return;
+  barKey = key;
+  const ink = [31, 42, 18], color = '#' + ink.map((c, i) => Math.round(fieldTop[i] * (1 - dim) + c * dim).toString(16).padStart(2, '0')).join('');
+  themeMeta.content = color;
+  // the page colour too, in case iOS samples that instead
+  if (standalone) document.documentElement.style.background = document.body.style.background = color;
+}
+
 // ---------- layout: the app fills the screen exactly, framed in gold, with a sharp canvas ----------
 const app = $('app'), court = document.querySelector('.court');
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -725,10 +747,13 @@ function layout() {
   let bx, by, bw, bh, radius;
   if (full) {
     const frame = Math.round(Math.min(10, Math.max(5, Math.min(vw, vh) * .016)));
-    bx = by = frame; bw = vw - 2 * frame; bh = vh - 2 * frame;
+    // when iOS draws its own status bar above the app (no top inset), the app starts just below it, away from the
+    // screen's rounded corners: no frame along the top and square top corners, so the field runs straight up into the
+    // status bar, which is painted the same colour (see syncStatusBar)
+    const underBar = standalone && safe.t === 0;
+    bx = frame; by = underBar ? 0 : frame; bw = vw - 2 * frame; bh = vh - by - frame;
     radius = Math.max(8, cornerRadius() - frame); // inner curve of the frame runs parallel to the screen's corner
-    // with an opaque status bar (no top inset) the page starts below it, away from the rounded corners
-    if (standalone && safe.t === 0) radius = `10px 10px ${radius}px ${radius}px`;
+    if (underBar) radius = `0 0 ${radius}px ${radius}px`;
   } else {
     const m = 18; // room for the gold rim
     bx = Math.max(m, safe.l + 8); by = Math.max(m, safe.t + 8);
@@ -2033,6 +2058,7 @@ function frame(now) {
   if (!n) return;
   syncChrome();
   render();
+  syncStatusBar();
 }
 function render() {
   ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
